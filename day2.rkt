@@ -1,9 +1,10 @@
 #lang racket
 
 (require threading)
+(require srfi/26)
 
 
-; some utility functions
+; some helper functions
 
 (define (apply-left f)
   (lambda (p)
@@ -29,71 +30,51 @@
 
 ; part 1
 
-(define (make-direction p)
-  (let ([direction (car p)]
-        [value (cdr p)])
+(define (step1 x acc)
+  (let ([direction (car x)]
+        [value (cdr x)])
     (cond
-      [(eq? direction 'forward) (cons 0 value)]
-      [(eq? direction 'up) (cons (- value) 0)]
-      [(eq? direction 'down) (cons value 0)]
-      [else (cons 0 0)])))
+      [(eq? direction 'forward)
+         (hash-update acc 'horizontal (curry + value))]
+      [(eq? direction 'up)
+         (hash-update acc 'vertical (cut - <> value))]
+      [(eq? direction 'down)
+         (hash-update acc 'vertical (curry + value))])))
 
 (define (add-pairs p1 p2)
   (cons (+ (car p1) (car p2))
         (+ (cdr p1) (cdr p2))))
 
-(define (multiply-pair p)
-  (* (car p) (cdr p)))
+(define (multiply-dimensions h)
+  (apply * (hash-values h)))
 
 (define (part1 xs)
   (~>> xs
-      (map make-direction)
-      (foldl add-pairs (cons 0 0))
-      multiply-pair))
+      (foldl step1 (hasheq 'horizontal 0 'vertical 0))
+      multiply-dimensions))
 
 
 ; part 2
-; acc: (horizontal, depth, aim)
 
-(define (modify-pos f l)
-  (list (f (first l)) (second l) (third l)))
-
-(define (increase-pos x l)
-  (modify-pos (curry + x) l))
-
-(define (modify-depth f l)
-  (list (first l) (f (second l)) (third l)))
-
-(define (increase-depth x l)
-  (modify-depth (curry + x) l))
-
-(define (modify-aim f l)
-  (list (first l) (second l) (f (third l))))
-
-(define (increase-aim x l)
-  (modify-aim (curry + x) l))
-
-(define (decrease-aim x l)
-  (modify-aim (lambda (y) (- y x)) l))
-
-(define (step x acc)
+(define (step2 x acc)
   (let ([direction (car x)]
         [value (cdr x)]
-        [aim (third acc)])
+        [aim (hash-ref acc 'aim)])
     (cond
       [(eq? direction 'forward)
-         (~>> acc
-              (increase-pos value)
-              (increase-depth (* aim value)))]
-      [(eq? direction 'up) (decrease-aim value acc)]
-      [(eq? direction 'down) (increase-aim value acc)])))
+         (~> (hash-update acc 'pos (curry + value))
+             (hash-update 'depth (curry + (* aim value))))]
+      [(eq? direction 'up)
+         (hash-update acc 'aim (cut - <> value))]
+      [(eq? direction 'down)
+         (hash-update acc 'aim (curry + value))])))
 
-(define (mul-pos-depth l)
-  (* (first l) (second l)))
+(define (mul-pos-depth h)
+  (* (hash-ref h 'pos) (hash-ref h 'depth)))
 
 (define (part2 xs)
   (~>> xs
-       (foldl step (list 0 0 0))
+       (foldl step2 (hasheq 'pos 0 'depth 0 'aim 0))
        mul-pos-depth))
 
 
